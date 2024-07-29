@@ -1,3 +1,3 @@
 # Link
 
-[(seasonbench)\[https://www.seasonbench.xyz\]]
+[(seasonbench)\[http://www.seasonbench.xyz\]]
