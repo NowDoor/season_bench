@@ -118,7 +118,7 @@ class Reranker(Retriever):
     
 class graph_node(Reranker):
     def __init__(self, col_name, llm, top_k):
-        self.check_model = ChatOpenAI(openai_api_key= config.get('key', 'gpt') , 
+        self.check_model = ChatOpenAI(openai_api_key = config.get('key', 'gpt') , 
                                  temperature=0.7,  
                                  model_name="gpt-4o-mini")
         

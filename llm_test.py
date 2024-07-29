@@ -350,6 +350,6 @@ with gr.Blocks() as app:
     
     LLM_Bench.select(fn = score_selected, outputs = score)
     
-#app.launch(server_name= '220.82.71.6', server_port = 5656)
+app.launch(server_name= '220.82.71.6', server_port = 5656)
 
-app.launch()
+#app.launch()
