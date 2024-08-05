@@ -145,7 +145,7 @@ def retry(btn):
 def bench_clicked(bench_test, bench_llm, rag_data):
     llm = llm_list[bench_llm]
     df = pd.read_csv(os.path.join('data','bench_files',bench_test+'.csv'))
-    df = df.sample(frac=1)
+    #df = df.sample(frac=1)
     top_k = 5
     top_p = 5
     if not 'category' in df.columns:
@@ -153,7 +153,7 @@ def bench_clicked(bench_test, bench_llm, rag_data):
 
     datasets = []
     for idx,data in df.iterrows():
-        prompt = '\n \n'.join([data['prompt'], 'A :' + data['A'],'B :' +  data['B'], 'C :' + data['C'], 'D :' + data['D'], 'E :' + data['E']])
+        prompt = '\n'.join([data['prompt'], 'A :' + data['A'],'B :' +  data['B'], 'C :' + data['C'], 'D :' + data['D'], 'E :' + data['E']])
         datasets.append([prompt, data['answer'], data['category']])            
         
     
@@ -180,18 +180,19 @@ def bench_clicked(bench_test, bench_llm, rag_data):
             ("user", "{input}")])
 
         else :
-            #retriever = Retriever(rag_data, llm,  top_k)
-            retriever = Reranker(rag_data, llm,  8)
-            context = retriever.get_reranker_docs(data[0], top_p)
-            #context = retriever.get_docs(data[0])
+            retriever = Retriever(rag_data, llm,  top_k)
+            #retriever = Reranker(rag_data, llm,  8)
+            #context = retriever.get_reranker_docs(data[0], top_p)
+            context = retriever.get_docs(data[0])
             print(context)
             prompt = ChatPromptTemplate.from_messages([
-            ("system", f"참조: {context}"),
+            ("system", f"{context}"),
             
-            ("user", "위에 내가 제공하는 문서 기반해서 주어지는 문제에 대한 맞는 답을 알파벳 하나만 출력해\
-                    해답에 대한 설명과 문제 내용은 쓰지마 \
-                    대답 예시: A\n\
-                    문제 : \n{input}")
+            ("user", " 참조 : 라고 써있는 부분은 답변하기 어려울 것을 생각해서 참고 자료를 너에게 주는거야\
+            주어지는 문제에 대한 맞는 답을 알파벳 하나만 출력해야 돼\
+            해답에 대한 설명과 문제 내용은 쓰지마\
+            대답 예시: A\
+            문제 : \n{input}")
             ])
         
         chain = prompt | llm

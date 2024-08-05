@@ -111,9 +111,9 @@ class Reranker(Retriever):
 
         score_pair.sort(reverse = True, key= lambda score_pair: score_pair[1])
 
-        relevant_docs = '\n'
-        for text in score_pair[:top_k]:
-            relevant_docs += text[0]
+        relevant_docs = '1번 참조 :'
+        for idx,text in enumerate(score_pair[:top_k]):
+            relevant_docs = f'\n {idx + 2}번 참조:'.join(text[0])
 
         return relevant_docs
     

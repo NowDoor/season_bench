@@ -1,6 +1,6 @@
 llm,score,vote
-gpt-4o-mini,919,16
-gpt-4o,1203,16
+gpt-4o-mini,948,17
+gpt-4o,1069,21
 llama-3.1-8b,820,8
-claude-3-5-sonnet-20240620,1155,20
-llama3.1-70b,912,10
+claude-3-5-sonnet-20240620,1241,22
+llama3.1-70b,925,14
