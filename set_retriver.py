@@ -75,6 +75,7 @@ class Retriever:
 
 class Reranker(Retriever):
     def __init__(self, col_name, llm, top_k):
+        super().__init__(col_name, llm, top_k)
         self.tokenizer =  AutoTokenizer.from_pretrained('BAAI/bge-reranker-v2-m3')
         self.model = AutoModelForSequenceClassification.from_pretrained('BAAI/bge-reranker-v2-m3')
 

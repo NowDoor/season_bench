@@ -1,25 +1,23 @@
-import elo 
-from datetime import datetime
-import gradio as gr
-import os
-import numpy as np
 import random
 import pandas as pd
-import datetime
 import itertools
-import milvus_manager as mm
-import math
 import configparser
 import matplotlib.pyplot as plt
-from set_retriver import Retriever
-from set_retriver import Reranker
+import gradio as gr
+import pickle
+import os
 
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableParallel, RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough
 from langchain_anthropic import ChatAnthropic
+
+import elo
+import milvus_manager as mm
+from set_retriver import Retriever
+from set_retriver import Reranker
+
 
 
 config = configparser.ConfigParser()
@@ -28,28 +26,31 @@ config.read('config/key.ini')
 llm_list = {'gpt-4o': ChatOpenAI(openai_api_key = config.get('key' , 'gpt') , 
                                  temperature=0,  
                                  model_name="gpt-4o"), 
-        'gpt-3.5-turbo' : ChatOpenAI(openai_api_key = config.get('key' , 'gpt') , 
-                                     temperature=0,  
-                                     model_name="gpt-3.5-turbo"),
+        #'gpt-3.5-turbo' : ChatOpenAI(openai_api_key = config.get('key' , 'gpt') , 
+        #                             temperature=0,  
+        #                             model_name="gpt-3.5-turbo"),
         'claude-3-5-sonnet-20240620' : ChatAnthropic(model='claude-3-5-sonnet-20240620', 
                                                      anthropic_api_key = config.get('key' , 'claude') , 
                                                      temperature=0),
-        'llama-3-Korean-Bllossom-8B': ChatOpenAI(model='MLP-KTLim/llama-3-Korean-Bllossom-8B',
-                                 openai_api_base = config.get('port' , '0'), openai_api_key='EMPTY', # vllm 
-                                 temperature=0),
-        'EEVE-Korean-10.8B': ChatOpenAI(openai_api_base = config.get('port' , '01'), openai_api_key='EMPTY', model_name='EEVE-Korean-10.8B:latest', temperature=0),
+        #'llama-3-Korean-Bllossom-8B': ChatOpenAI(model='MLP-KTLim/llama-3-Korean-Bllossom-8B',
+        #                         openai_api_base = config.get('port' , '0'), openai_api_key='EMPTY', # vllm 
+        #                         temperature=0),
+        #'EEVE-Korean-10.8B': ChatOpenAI(openai_api_base = config.get('port' , '01'), openai_api_key='EMPTY', model_name='EEVE-Korean-10.8B:latest', temperature=0),
         'llama3.1-70b': ChatOpenAI(openai_api_base = config.get('port' , '1'), openai_api_key='EMPTY', model_name='hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4', temperature=0),
-        'wizardLM-2-8x22B': ChatOpenAI(openai_api_base= config.get('port' , 'ex'), 
-            openai_api_key= config.get('key' , 'wizard'), 
-            temperature= 0, 
-            top_p= 1 , 
-            model_name="microsoft/wizardlm-2-8x22b"),
+        #'wizardLM-2-8x22B': ChatOpenAI(openai_api_base= config.get('port' , 'ex'), 
+        #    openai_api_key= config.get('key' , 'wizard'), 
+        #    temperature= 0, 
+        #    top_p= 1 , 
+        #    model_name="microsoft/wizardlm-2-8x22b"),
         'gpt-4o-mini' : ChatOpenAI(openai_api_key=config.get('key' , 'gpt') , 
                                  temperature=0,  
                                  model_name="gpt-4o-mini"), 
-        'llama-3.1-8b': ChatOpenAI(model='meta-llama/Meta-Llama-3.1-8B-Instruct',
-                                 openai_api_base = config.get('port' , '1'), openai_api_key='EMPTY', # vllm 
-                                 temperature=0),
+        #'llama-3.1-8b': ChatOpenAI(model='meta-llama/Meta-Llama-3.1-8B-Instruct',
+        #                         openai_api_base = config.get('port' , '1'), openai_api_key='EMPTY', # vllm 
+        #                         temperature=0),
+        #'Qwen2-72B-Instruct': ChatOpenAI(model='Qwen/Qwen2-72B-Instruct-GPTQ-Int4',
+        #                         openai_api_base = config.get('port' , '1'), openai_api_key='EMPTY', # vllm 
+        #                         temperature=0),    
 }
 
 
@@ -144,29 +145,28 @@ def retry(btn):
 def bench_clicked(bench_test, bench_llm, rag_data):
     llm = llm_list[bench_llm]
     df = pd.read_csv(os.path.join('data','bench_files',bench_test+'.csv'))
+    df = df.sample(frac=1)
     top_k = 5
     top_p = 5
-    if not 'Function' in df.columns:
-        df['Function'] = bench_test
+    if not 'category' in df.columns:
+        df['category'] = bench_test
 
     datasets = []
     for idx,data in df.iterrows():
-        prompt = '\n'.join([data['prompt'], 'A :' + data['A'],'B :' +  data['B'], 'C :' + data['C'], 'D :' + data['D'], 'E :' + data['E']])
-        datasets.append([prompt, data['answer'], data['Function']])            
+        prompt = '\n \n'.join([data['prompt'], 'A :' + data['A'],'B :' +  data['B'], 'C :' + data['C'], 'D :' + data['D'], 'E :' + data['E']])
+        datasets.append([prompt, data['answer'], data['category']])            
         
     
     category_score = {}
     category_idx = {}
 
-    for key in df['Function'].unique():
+    for key in df['category'].unique():
         category_score[key] = 0
         category_idx[key] = 0
 
     df = pd.DataFrame({'Idx': [], 'Acc':[]})
     fig = plt.figure()
     plt.title(f'{bench_test} Score!')
-    plt.xlim(0,len(datasets))
-    plt.ylim(0,100)
 
     text_score = f'Idx : 0, Score : 0'
     for idx, data in enumerate(datasets):
@@ -180,11 +180,11 @@ def bench_clicked(bench_test, bench_llm, rag_data):
             ("user", "{input}")])
 
         else :
-            retriever = Retriever(rag_data, llm,  top_k)
-            #retriever = Reranker(rag_data, llm,  5)
-            #context = retriever.get_reranker_docs(data[0], top_p)
-            context = retriever.get_docs(data[0])
-
+            #retriever = Retriever(rag_data, llm,  top_k)
+            retriever = Reranker(rag_data, llm,  8)
+            context = retriever.get_reranker_docs(data[0], top_p)
+            #context = retriever.get_docs(data[0])
+            print(context)
             prompt = ChatPromptTemplate.from_messages([
             ("system", f"참조: {context}"),
             
@@ -198,7 +198,7 @@ def bench_clicked(bench_test, bench_llm, rag_data):
 
         result = chain.invoke({"input": data[0]})
 
-        print(result)
+        
         if data[1] in result.content:
             category_score[data[2]] += 1
 
@@ -206,19 +206,22 @@ def bench_clicked(bench_test, bench_llm, rag_data):
 
         temp = [idx+1, round((sum(category_score.values()) / (idx + 1))*100, 2)]
         df.loc[df.shape[0]] = temp
-        plt.plot(df['Idx'], df['Acc'])
+        plt.clf()
+        plt.title(f'{bench_test} Category Score!')
+
+        y = []
+        plt.ylim(0,100)
+        plt.xticks(rotation=20)
+        for score, count in zip(category_score.values(), category_idx.values()):
+            y.append(score / count * 100 if count != 0 else 0)
+        plt.bar(category_score.keys(), y)
 
         if ((idx+1) % 10 == 0):
             text_score = f'Idx : {temp[0]}, Score : {temp[1]}'
 
         if idx+1 == len(datasets):
-            plt.clf()
-            plt.title(f'{bench_test} Category Score!')
-            y = []
-            for score, count in zip(category_score.values(), category_idx.values()):
-                y.append(score / count * 100)
-            plt.bar(category_score.keys(), y)
-            df.to_csv(f'output/bench_log/{bench_test}_{bench_llm}_{rag_data}_{top_k}')
+            with open(f'output/bench_log/{bench_test}_{bench_llm}_{rag_data}_{top_k}','wb') as fw:
+                pickle.dump(category_score, fw)
             yield fig, f'Idx : {temp[0]}, Score : {temp[1]}'
         else:
             yield fig, text_score
@@ -350,6 +353,6 @@ with gr.Blocks() as app:
     
     LLM_Bench.select(fn = score_selected, outputs = score)
     
-app.launch(server_name= '220.82.71.6', server_port = 5656)
+#app.launch(server_name= '220.82.71.6', server_port = 5656)
 
-#app.launch()
+app.launch()
