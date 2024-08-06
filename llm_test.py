@@ -197,8 +197,19 @@ def bench_clicked(bench_test, bench_llm, rag_data):
         
         chain = prompt | llm
 
-        result = chain.invoke({"input": data[0]})
+        try:
+            result = chain.invoke({"input": data[0]})
 
+        except: 
+            prompt = ChatPromptTemplate.from_messages([
+            ("system", """
+            주어지는 문제에 대한 맞는 답을 알파벳 하나만 출력해야 돼
+            해답에 대한 설명과 문제 내용은 쓰지마
+            대답 예시: A
+            """),
+            ("user", "{input}")])
+            chain = prompt | llm
+            result = chain.invoke({"input": data[0]})
         
         if data[1] in result.content:
             category_score[data[2]] += 1
